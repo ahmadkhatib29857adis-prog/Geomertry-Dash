@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Geometry Dash Web</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    background: linear-gradient(180deg, #0a0022, #150033);
+    color:#fff;
+    font-family:'Courier New', monospace;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    overflow:hidden;
+    flex-direction:column;
+}
+#menu, #gameContainer, #leaderboard { display:none; text-align:center; }
+#menu.active, #gameContainer.active, #leaderboard.active { display:block; }
+input {
+    padding:12px;
+    font-size:16px;
+    border-radius:5px;
+    border:2px solid #00ffff;
+    background:#111;
+    color:#fff;
+    text-align:center;
+}
+button {
+    margin-top:15px;
+    padding:15px 25px;
+    font-size:18px;
+    border:2px solid #00ffff;
+    background:#111;
+    color:#00ffff;
+    border-radius:8px;
+    cursor:pointer;
+}
+button:hover { background:#00ffff; color:#111; }
+canvas {
+    border:3px solid #fff;
+    border-radius:10px;
+    background: linear-gradient(180deg,#1b003a,#0a001a);
+    touch-action:none;
+}
+</style>
+</head>
+<body>
+<div id="menu">
+<h1>⚡ Geometry Dash Web ⚡</h1>
+<div id="nameSection">
+<p>Enter your name to start:</p>
+<input type="text" id="playerNameInput" placeholder="Your name">
+<br>
+<button onclick="setName()">Save Name</button>
+</div>
+<div id="startSection" style="display:none;">
+<p id="welcome"></p>
+<button onclick="startGame()">Start Game</button>
+<button onclick="showLeaderboard()">View Leaderboard</button>
+<button onclick="resetName()">Change Name</button>
+</div>
+</div>
+
+<div id="gameContainer">
+<canvas id="game"></canvas>
+<p id="scoreDisplay">Score: 0</p>
+</div>
+
+<div id="leaderboard">
+<h2>🏆 Top Scores</h2>
+<ol id="scoresList"></ol>
+<button onclick="backToMenu()">Back to Menu</button>
+</div>
+
+<script type="module">
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let playerName="";
+let player, obstacles, score, speed, frame, gameOver;
+let canDoubleJump=true;
+
+// Make canvas responsive
+function resizeCanvas(){
+    canvas.width = window.innerWidth*0.9;
+    canvas.height = Math.min(window.innerHeight*0.7,500);
+}
+window.addEventListener("resize",resizeCanvas);
+resizeCanvas();
+
+window.onload = ()=>{
+    const savedName = localStorage.getItem("playerName");
+    if(savedName){
+        playerName = savedName;
+        document.getElementById("nameSection").style.display="none";
+        document.getElementById("startSection").style.display="block";
+        document.getElementById("welcome").innerText=`Welcome back, ${playerName}!`;
+    } else {
+        document.getElementById("nameSection").style.display="block";
+    }
+    document.getElementById("menu").classList.add("active");
+};
+
+window.setName=function(){
+    const input=document.getElementById("playerNameInput").value.trim();
+    if(input){
+        playerName=input;
+        localStorage.setItem("playerName",playerName);
+        document.getElementById("nameSection").style.display="none";
+        document.getElementById("startSection").style.display="block";
+        document.getElementById("welcome").innerText=`Welcome, ${playerName}!`;
+    }
+};
+window.resetName=function(){ localStorage.removeItem("playerName"); location.reload(); };
+
+// Firebase setup
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, set, push, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const firebaseConfig={
+    apiKey:"AIzaSyBobsb9V8EPLQV6A8-GITkKuruJcSm2CEU",
+    authDomain:"geometrydash-web.firebaseapp.com",
+    databaseURL:"https://geometrydash-web-default-rtdb.firebaseio.com",
+    projectId:"geometrydash-web",
+    storageBucket:"geometrydash-web.firebasestorage.app",
+    messagingSenderId:"718046642772",
+    appId:"1:718046642772:web:c2b59ca0ac86dd424d23c1",
+    measurementId:"G-PVYSNDTZCC"
+};
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+async function updateLeaderboard(name,score){
+    const scoresRef=ref(db,"leaderboard");
+    const newEntry=push(scoresRef);
+    await set(newEntry,{name:name,score:Math.floor(score),time:Date.now()});
+}
+
+async function renderLeaderboard(){
+    const scoresRef=query(ref(db,"leaderboard"),orderByChild("score"),limitToLast(5));
+    const snapshot=await get(scoresRef);
+    const board=[];
+    snapshot.forEach(child=>{board.push(child.val());});
+    board.sort((a,b)=>b.score-b.score);
+    const list=document.getElementById("scoresList");
+    list.innerHTML="";
+    board.forEach((entry,i)=>{
+        const li=document.createElement("li");
+        li.textContent=`${i+1}. ${entry.name} — ${entry.score}`;
+        list.appendChild(li);
+    });
+}
+
+window.startGame=function(){
+    document.getElementById("menu").classList.remove("active");
+    document.getElementById("gameContainer").classList.add("active");
+    initGame();
+};
+
+window.showLeaderboard=function(){ renderLeaderboard(); document.getElementById("menu").classList.remove("active"); document.getElementById("leaderboard").classList.add("active"); };
+window.backToMenu=function(){ document.getElementById("leaderboard").classList.remove("active"); document.getElementById("menu").classList.add("active"); };
+
+// Game logic
+function initGame(){
+    player={x:100,y:canvas.height-60,w:40,h:40,color:"#00ffff",dy:0,gravity:0.8,jumpPower:-12,grounded:false};
+    obstacles=[]; speed=6; score=0; frame=0; gameOver=false; canDoubleJump=true;
+    loop();
+}
+
+// Controls: keyboard
+document.addEventListener("keydown",e=>{
+    if((e.code==="Space"||e.code==="ArrowUp")&&!gameOver){
+        if(player.grounded){player.dy=player.jumpPower;player.grounded=false;canDoubleJump=true;}
+        else if(canDoubleJump){player.dy=player.jumpPower;canDoubleJump=false;}
+    }
+    if(gameOver&&e.code==="Space"){ document.getElementById("leaderboard").classList.remove("active"); document.getElementById("menu").classList.add("active"); }
+});
+
+// Controls: touch for mobile
+document.addEventListener("touchstart",e=>{
+    e.preventDefault();
+    if(!gameOver){
+        if(player.grounded){player.dy=player.jumpPower;player.grounded=false;canDoubleJump=true;}
+        else if(canDoubleJump){player.dy=player.jumpPower;canDoubleJump=false;}
+    }
+    if(gameOver){ document.getElementById("leaderboard").classList.remove("active"); document.getElementById("menu").classList.add("active"); }
+},{passive:false});
+
+// Obstacles
+function spawnObstacle(){ const height=Math.random()*100+30; obstacles.push({x:canvas.width,y:canvas.height-40-height,w:30,h:height,color:"#ff0055"}); }
+function collision(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+
+// Game loop
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#220044";
+    for(let i=0;i<40;i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2,2);
+    ctx.fillStyle="#333";
+    ctx.fillRect(0,canvas.height-40,canvas.width,40);
+    ctx.save();
+    ctx.translate(player.x+player.w/2,player.y+player.h/2);
+    const rotation=player.grounded?0:(Math.PI/180)*(score%360);
+    ctx.rotate(rotation);
+    ctx.fillStyle=player.color;
+    ctx.fillRect(-player.w/2,-player.h/2,player.w,player.h);
+    ctx.restore();
+    obstacles.forEach(ob=>{ ctx.fillStyle=ob.color; ctx.fillRect(ob.x,ob.y,ob.w,ob.h); });
+    document.getElementById("scoreDisplay").innerText=`Score: ${Math.floor(score)}`;
+    if(gameOver){ ctx.fillStyle="#ff5555"; ctx.font="40px sans-serif"; ctx.fillText("GAME OVER",canvas.width/2-120,canvas.height/2-20); ctx.font="20px monospace"; ctx.fillText("Tap/SPACE to return",canvas.width/2-100,canvas.height/2+20);}
+}
+
+function update(){
+    if(gameOver) return;
+    player.dy+=player.gravity;
+    player.y+=player.dy;
+    if(player.y+player.h>=canvas.height-40){player.y=canvas.height-40-player.h; player.dy=0; player.grounded=true;}
+    obstacles.forEach(ob=>ob.x-=speed);
+    obstacles=obstacles.filter(ob=>ob.x+ob.w>0);
+    if(frame%90===0) spawnObstacle();
+    for(let ob of obstacles){ if(collision(player,ob)){ gameOver=true; updateLeaderboard(playerName,score); renderLeaderboard(); document.getElementById("gameContainer").classList.remove("active"); document.getElementById("leaderboard").classList.add("active"); }}
+    score+=0.5;
+    frame++;
+}
+
+function loop(){ update(); draw(); if(!gameOver) requestAnimationFrame(loop); else draw(); }
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "geometrydash-web",
+  "version": "1.0.0",
+  "description": "Geometry Dash style web game with Firebase leaderboard",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "build": "npm install"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
