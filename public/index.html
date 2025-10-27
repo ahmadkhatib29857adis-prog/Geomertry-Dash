@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Geometry Dash Web</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0022;color:#fff;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;flex-direction:column;}
+#menu,#gameContainer,#leaderboard{display:none;text-align:center;}
+#menu.active,#gameContainer.active,#leaderboard.active{display:block;}
+input{padding:12px;font-size:16px;border-radius:5px;border:2px solid #00ffff;background:#111;color:#fff;text-align:center;}
+button{margin-top:15px;padding:15px 25px;font-size:18px;border:2px solid #00ffff;background:#111;color:#00ffff;border-radius:8px;cursor:pointer;}
+button:hover{background:#00ffff;color:#111;}
+canvas{border:3px solid #fff;border-radius:10px;background: linear-gradient(180deg,#1b003a,#0a001a);touch-action:none;}
+</style>
+</head>
+<body>
+<div id="menu" class="active"><h1>⚡ Geometry Dash Web ⚡</h1></div>
+<div id="gameContainer"><canvas id="game"></canvas></div>
+<div id="leaderboard"><h2>Leaderboard</h2></div>
+<script type="module">
+// Your full mobile-ready JS game code goes here
+</script>
+</body>
+</html>
